@@ -1,0 +1,56 @@
+Traza ReAct - {"fecha": "2026-10-05T19:46:54", "modelo": "gemini-3.8-flash", "recursion_limit": 10, "checkpointer": "AsyncSqliteSaver", "total_tool_calls": 8}
+
+=== Escenario 1: Multi-paso: el agente encadena dos herramientas ===
+[thread_id=sesion-ana] Usuario: ¿Cuántos pedidos hizo Ana Gómez y cuánto gastó en total?
+   1. (agente) Acción: buscar_cliente({"nombre": "Ana Gómez"})
+   2. (tools) Observación [buscar_cliente]: {"cliente_id": 102, "nombre": "Ana Gómez", "ciudad": "Rosario"}
+   3. (agente) Acción: buscar_pedidos({"cliente_id": 102})
+   4. (tools) Observación [buscar_pedidos]: {"cliente_id": 102, "nombre": "Ana Gómez", "cantidad_pedidos": 3, "total": 14500, "pedidos": [{"pedido_id": 1001, "fecha": "2026-07-03", "estado": "entregado", "monto": 5000}, {"pedido_id": 1004, "fecha": "2026-08-15", "estado": "entregado", "monto": 3500}, {"pedido_id": 1007, "fecha": "2026-09-20", "estado": "en camino", "monto": 6000}], "ultimo_pedido_id": 1007}
+   5. (agente) Respuesta final: Ana Gómez hizo 3 pedidos y gastó en total $14.500.
+  -> 2 llamadas a herramientas en 63.15 s
+
+=== Escenario 2: Memoria persistente: mismo thread_id tras reabrir el SQLite ===
+# Checkpointer y grafo recreados desde checkpoints.sqlite: el thread 'sesion-ana' trae 6 mensajes guardados en la fase anterior.
+[thread_id=sesion-ana] Usuario: ¿Y cuál fue el último? ¿Qué compró en ese pedido?
+   1. (agente) Acción: detalle_pedido({"pedido_id": 1007})
+   2. (tools) Observación [detalle_pedido]: {"pedido_id": 1007, "cliente_id": 102, "cliente": "Ana Gómez", "fecha": "2026-09-20", "estado": "en camino", "items": [{"producto": "Auriculares con micrófono", "cantidad": 1, "precio_unitario": 6000, "subtotal": 6000}], "total": 6000}
+   3. (agente) Respuesta final: El último pedido fue el **#1007** (del 20/09/2026, actualmente en camino). 
+
+Compró:
+- 1x Auriculares con micrófono ($6.000)
+
+El total de ese pedido fue de $6.000.
+  -> 1 llamadas a herramientas en 62.61 s
+
+=== Escenario 3: Ciclo de retorno: error de la herramienta -> reintento ===
+[thread_id=sesion-ruiz] Usuario: ¿Cuánto gastó en total Carlos Ruiz Díaz?
+   1. (agente) Acción: buscar_cliente({"nombre": "Carlos Ruiz Díaz"})
+   2. (tools) Observación [buscar_cliente]: {"error": "cliente no encontrado: ninguno coincide con 'Carlos Ruiz Díaz'", "sugerencia": "Reintentá con una sola palabra (solo el apellido o solo el nombre). Si tampoco aparece, avisale al usuario que no existe y pedile que revise el nombre."}
+   3. (agente) Acción: buscar_cliente({"nombre": "Ruiz"})
+   4. (tools) Observación [buscar_cliente]: {"cliente_id": 105, "nombre": "Carlos Ruiz", "ciudad": "La Plata"}
+   5. (agente) Acción: buscar_pedidos({"cliente_id": 105})
+   6. (tools) Observación [buscar_pedidos]: {"cliente_id": 105, "nombre": "Carlos Ruiz", "cantidad_pedidos": 1, "total": 15500, "pedidos": [{"pedido_id": 1009, "fecha": "2026-09-30", "estado": "en camino", "monto": 15500}], "ultimo_pedido_id": 1009}
+   7. (agente) Respuesta final: Carlos Ruiz gastó en total $15.500 (tiene un único pedido registrado por ese monto).
+  -> 3 llamadas a herramientas en 80.56 s
+
+=== Escenario 4: Ciclo de retorno: nombre ambiguo -> pide aclaración ===
+[thread_id=sesion-martinez] Usuario: ¿Cuánto gastó en total el cliente Martínez?
+   1. (agente) Acción: buscar_cliente({"nombre": "Martínez"})
+   2. (tools) Observación [buscar_cliente]: {"error": "nombre ambiguo: 2 clientes coinciden con 'Martínez'", "sugerencia": "No elijas uno al azar: preguntale al usuario a cuál de estos clientes se refiere.", "coincidencias": [{"cliente_id": 103, "nombre": "Lucía Martínez", "ciudad": "Mendoza"}, {"cliente_id": 104, "nombre": "Pablo Martínez", "ciudad": "Buenos Aires"}]}
+   3. (agente) Respuesta final: Encontré dos clientes con el apellido Martínez:
+
+- **Lucía Martínez** (Mendoza)
+- **Pablo Martínez** (Buenos Aires)
+
+¿A cuál de los dos te referís?
+  -> 1 llamadas a herramientas en 64.54 s
+[thread_id=sesion-martinez] Usuario: Me refiero a Lucía.
+   1. (agente) Acción: buscar_pedidos({"cliente_id": 103})
+   2. (tools) Observación [buscar_pedidos]: {"cliente_id": 103, "nombre": "Lucía Martínez", "cantidad_pedidos": 2, "total": 18400, "pedidos": [{"pedido_id": 1003, "fecha": "2026-07-18", "estado": "entregado", "monto": 8500}, {"pedido_id": 1008, "fecha": "2026-09-28", "estado": "en preparación", "monto": 9900}], "ultimo_pedido_id": 1008}
+   3. (agente) Respuesta final: Lucía Martínez gastó en total **$18.400** (en 2 pedidos).
+  -> 1 llamadas a herramientas en 59.91 s
+
+=== Escenario 5: Aislamiento: otro thread_id no comparte memoria ===
+[thread_id=sesion-nueva] Usuario: ¿Y cuál fue el último pedido?
+   1. (agente) Respuesta final: ¿De qué cliente estamos hablando? Decime su nombre o apellido así te busco los pedidos.
+  -> 0 llamadas a herramientas en 86.34 s
