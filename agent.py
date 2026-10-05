@@ -24,12 +24,22 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.types import RetryPolicy
 
 from tools import TOOLS
 
 # Cada vuelta modelo -> herramientas consume 2 pasos del grafo. Con 10 entran hasta 4
 # rondas de herramientas más la respuesta final; un bucle infinito se corta ahí.
 RECURSION_LIMIT = 10
+# Reintentos del nodo `agente` ante errores transitorios del proveedor (429 por cuota
+# por minuto, 5xx). Esperas de 20 s, 40 s y 80 s: alcanzan para que se libere la ventana
+# de un minuto del free tier de Gemini. Los errores permanentes (401, 400) no se reintentan.
+RETRY_MODELO = RetryPolicy(
+    max_attempts=4,
+    initial_interval=20.0,
+    backoff_factor=2.0,
+    retry_on=lambda exc: getattr(exc, "status_code", None) in {429, 500, 502, 503, 504},
+)
 # Presupuesto (aproximado) de tokens del historial que se manda al modelo en cada llamada.
 MAX_TOKENS_HISTORIAL = 4000
 
@@ -88,6 +98,7 @@ def build_graph(
     model: BaseChatModel,
     checkpointer: BaseCheckpointSaver | None = None,
     max_tokens_historial: int = MAX_TOKENS_HISTORIAL,
+    retry_modelo: RetryPolicy = RETRY_MODELO,
 ) -> CompiledStateGraph:
     """Arma y compila el grafo ReAct. Sin checkpointer el agente no recuerda entre invocaciones."""
     llm_con_tools = model.bind_tools(TOOLS)
@@ -101,7 +112,7 @@ def build_graph(
         }
 
     builder = StateGraph(AgentState)
-    builder.add_node("agente", agente)
+    builder.add_node("agente", agente, retry_policy=retry_modelo)
     # handle_tool_errors=True: si una herramienta igual levanta una excepción (por
     # ejemplo, el modelo manda un argumento con el tipo equivocado), el error vuelve
     # como ToolMessage y el modelo puede corregirse en vez de romper el grafo.

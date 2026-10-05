@@ -92,7 +92,9 @@ def build_model() -> ChatOpenAICompatible:
         api_key=_require_env("OPENAI_API_KEY"),
         base_url=os.environ.get("OPENAI_BASE_URL") or None,
         temperature=0,  # un agente que consulta datos: lo más determinista posible
-        max_retries=2,  # reintentos de red/429 del SDK; los errores de herramientas los maneja el grafo
+        # Sin reintentos del SDK: los hace el nodo del grafo (agent.RETRY_MODELO) con esperas
+        # largas. Los reintentos rápidos del SDK contra un 429 solo gastan más cuota.
+        max_retries=0,
         timeout=60,
         rate_limiter=_rate_limiter(),
         disable_streaming=True,  # el rescate de extra_content está en la ruta sin streaming

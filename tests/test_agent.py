@@ -180,3 +180,43 @@ async def test_el_modelo_recibe_el_historial_recortado_pero_el_estado_guarda_tod
     ultimo_envio = model.recibidos[-1]
     assert len(ultimo_envio) < 12
     assert ultimo_envio[-1].content.startswith("pregunta 5")
+
+
+class _ErrorHttp(Exception):
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"HTTP {status_code}")
+        self.status_code = status_code
+
+
+class _ModeloQueFallaUnaVez(FakeToolModel):
+    """La primera llamada falla con un error HTTP; las siguientes responden normalmente."""
+
+    status_code: int = 429
+    fallo: bool = False
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        if not self.fallo:
+            self.fallo = True
+            raise _ErrorHttp(self.status_code)
+        return super()._generate(messages, stop, run_manager, **kwargs)
+
+
+async def test_el_nodo_agente_reintenta_un_429():
+    from langgraph.types import RetryPolicy
+
+    model = _ModeloQueFallaUnaVez(respuestas=[AIMessage("ok")])
+    rapido = RetryPolicy(max_attempts=2, initial_interval=0.01, retry_on=lambda e: getattr(e, "status_code", None) == 429)
+    graph = build_graph(model, InMemorySaver(), retry_modelo=rapido)
+
+    result = await graph.ainvoke({"messages": [HumanMessage("hola")]}, config_para("t"))
+
+    assert model.fallo and len(model.recibidos) == 1 and result["messages"][-1].content == "ok"
+
+
+async def test_un_error_permanente_no_se_reintenta():
+    model = _ModeloQueFallaUnaVez(respuestas=[AIMessage("ok")], status_code=401)
+    graph = build_graph(model, InMemorySaver())
+
+    with pytest.raises(_ErrorHttp):
+        await graph.ainvoke({"messages": [HumanMessage("hola")]}, config_para("t"))
+    assert model.recibidos == []  # falló una vez y no hubo segundo intento
