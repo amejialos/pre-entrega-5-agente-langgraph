@@ -1,0 +1,432 @@
+{
+  "metadata": {
+    "fecha": "2026-10-05T19:46:54",
+    "modelo": "gemini-3.8-flash",
+    "recursion_limit": 10,
+    "checkpointer": "AsyncSqliteSaver",
+    "total_tool_calls": 8
+  },
+  "escenarios": [
+    {
+      "titulo": "Multi-paso: el agente encadena dos herramientas",
+      "notas": [],
+      "turnos": [
+        {
+          "thread_id": "sesion-ana",
+          "pregunta": "¿Cuántos pedidos hizo Ana Gómez y cuánto gastó en total?",
+          "pasos": [
+            {
+              "paso": 1,
+              "nodo": "agente",
+              "react": "accion",
+              "pensamiento": null,
+              "tool_calls": [
+                {
+                  "id": "call_368822",
+                  "nombre": "buscar_cliente",
+                  "args": {
+                    "nombre": "Ana Gómez"
+                  }
+                }
+              ]
+            },
+            {
+              "paso": 2,
+              "nodo": "tools",
+              "react": "observacion",
+              "herramienta": "buscar_cliente",
+              "tool_call_id": "call_368822",
+              "estado": "success",
+              "resultado": {
+                "cliente_id": 102,
+                "nombre": "Ana Gómez",
+                "ciudad": "Rosario"
+              }
+            },
+            {
+              "paso": 3,
+              "nodo": "agente",
+              "react": "accion",
+              "pensamiento": null,
+              "tool_calls": [
+                {
+                  "id": "call_519471",
+                  "nombre": "buscar_pedidos",
+                  "args": {
+                    "cliente_id": 102
+                  }
+                }
+              ]
+            },
+            {
+              "paso": 4,
+              "nodo": "tools",
+              "react": "observacion",
+              "herramienta": "buscar_pedidos",
+              "tool_call_id": "call_519471",
+              "estado": "success",
+              "resultado": {
+                "cliente_id": 102,
+                "nombre": "Ana Gómez",
+                "cantidad_pedidos": 3,
+                "total": 14500,
+                "pedidos": [
+                  {
+                    "pedido_id": 1001,
+                    "fecha": "2026-07-03",
+                    "estado": "entregado",
+                    "monto": 5000
+                  },
+                  {
+                    "pedido_id": 1004,
+                    "fecha": "2026-08-15",
+                    "estado": "entregado",
+                    "monto": 3500
+                  },
+                  {
+                    "pedido_id": 1007,
+                    "fecha": "2026-09-20",
+                    "estado": "en camino",
+                    "monto": 6000
+                  }
+                ],
+                "ultimo_pedido_id": 1007
+              }
+            },
+            {
+              "paso": 5,
+              "nodo": "agente",
+              "react": "respuesta_final",
+              "contenido": "Ana Gómez hizo 3 pedidos y gastó en total $14.500."
+            }
+          ],
+          "respuesta": "Ana Gómez hizo 3 pedidos y gastó en total $14.500.",
+          "tool_calls": 2,
+          "error": null,
+          "duracion_s": 63.15
+        }
+      ]
+    },
+    {
+      "titulo": "Memoria persistente: mismo thread_id tras reabrir el SQLite",
+      "notas": [
+        "Checkpointer y grafo recreados desde checkpoints.sqlite: el thread 'sesion-ana' trae 6 mensajes guardados en la fase anterior."
+      ],
+      "turnos": [
+        {
+          "thread_id": "sesion-ana",
+          "pregunta": "¿Y cuál fue el último? ¿Qué compró en ese pedido?",
+          "pasos": [
+            {
+              "paso": 1,
+              "nodo": "agente",
+              "react": "accion",
+              "pensamiento": null,
+              "tool_calls": [
+                {
+                  "id": "call_441979",
+                  "nombre": "detalle_pedido",
+                  "args": {
+                    "pedido_id": 1007
+                  }
+                }
+              ]
+            },
+            {
+              "paso": 2,
+              "nodo": "tools",
+              "react": "observacion",
+              "herramienta": "detalle_pedido",
+              "tool_call_id": "call_441979",
+              "estado": "success",
+              "resultado": {
+                "pedido_id": 1007,
+                "cliente_id": 102,
+                "cliente": "Ana Gómez",
+                "fecha": "2026-09-20",
+                "estado": "en camino",
+                "items": [
+                  {
+                    "producto": "Auriculares con micrófono",
+                    "cantidad": 1,
+                    "precio_unitario": 6000,
+                    "subtotal": 6000
+                  }
+                ],
+                "total": 6000
+              }
+            },
+            {
+              "paso": 3,
+              "nodo": "agente",
+              "react": "respuesta_final",
+              "contenido": "El último pedido fue el **#1007** (del 20/09/2026, actualmente en camino). \n\nCompró:\n- 1x Auriculares con micrófono ($6.000)\n\nEl total de ese pedido fue de $6.000."
+            }
+          ],
+          "respuesta": "El último pedido fue el **#1007** (del 20/09/2026, actualmente en camino). \n\nCompró:\n- 1x Auriculares con micrófono ($6.000)\n\nEl total de ese pedido fue de $6.000.",
+          "tool_calls": 1,
+          "error": null,
+          "duracion_s": 62.61
+        }
+      ]
+    },
+    {
+      "titulo": "Ciclo de retorno: error de la herramienta -> reintento",
+      "notas": [],
+      "turnos": [
+        {
+          "thread_id": "sesion-ruiz",
+          "pregunta": "¿Cuánto gastó en total Carlos Ruiz Díaz?",
+          "pasos": [
+            {
+              "paso": 1,
+              "nodo": "agente",
+              "react": "accion",
+              "pensamiento": null,
+              "tool_calls": [
+                {
+                  "id": "call_301069",
+                  "nombre": "buscar_cliente",
+                  "args": {
+                    "nombre": "Carlos Ruiz Díaz"
+                  }
+                }
+              ]
+            },
+            {
+              "paso": 2,
+              "nodo": "tools",
+              "react": "observacion",
+              "herramienta": "buscar_cliente",
+              "tool_call_id": "call_301069",
+              "estado": "success",
+              "resultado": {
+                "error": "cliente no encontrado: ninguno coincide con 'Carlos Ruiz Díaz'",
+                "sugerencia": "Reintentá con una sola palabra (solo el apellido o solo el nombre). Si tampoco aparece, avisale al usuario que no existe y pedile que revise el nombre."
+              }
+            },
+            {
+              "paso": 3,
+              "nodo": "agente",
+              "react": "accion",
+              "pensamiento": null,
+              "tool_calls": [
+                {
+                  "id": "call_356652",
+                  "nombre": "buscar_cliente",
+                  "args": {
+                    "nombre": "Ruiz"
+                  }
+                }
+              ]
+            },
+            {
+              "paso": 4,
+              "nodo": "tools",
+              "react": "observacion",
+              "herramienta": "buscar_cliente",
+              "tool_call_id": "call_356652",
+              "estado": "success",
+              "resultado": {
+                "cliente_id": 105,
+                "nombre": "Carlos Ruiz",
+                "ciudad": "La Plata"
+              }
+            },
+            {
+              "paso": 5,
+              "nodo": "agente",
+              "react": "accion",
+              "pensamiento": null,
+              "tool_calls": [
+                {
+                  "id": "call_298340",
+                  "nombre": "buscar_pedidos",
+                  "args": {
+                    "cliente_id": 105
+                  }
+                }
+              ]
+            },
+            {
+              "paso": 6,
+              "nodo": "tools",
+              "react": "observacion",
+              "herramienta": "buscar_pedidos",
+              "tool_call_id": "call_298340",
+              "estado": "success",
+              "resultado": {
+                "cliente_id": 105,
+                "nombre": "Carlos Ruiz",
+                "cantidad_pedidos": 1,
+                "total": 15500,
+                "pedidos": [
+                  {
+                    "pedido_id": 1009,
+                    "fecha": "2026-09-30",
+                    "estado": "en camino",
+                    "monto": 15500
+                  }
+                ],
+                "ultimo_pedido_id": 1009
+              }
+            },
+            {
+              "paso": 7,
+              "nodo": "agente",
+              "react": "respuesta_final",
+              "contenido": "Carlos Ruiz gastó en total $15.500 (tiene un único pedido registrado por ese monto)."
+            }
+          ],
+          "respuesta": "Carlos Ruiz gastó en total $15.500 (tiene un único pedido registrado por ese monto).",
+          "tool_calls": 3,
+          "error": null,
+          "duracion_s": 80.56
+        }
+      ]
+    },
+    {
+      "titulo": "Ciclo de retorno: nombre ambiguo -> pide aclaración",
+      "notas": [],
+      "turnos": [
+        {
+          "thread_id": "sesion-martinez",
+          "pregunta": "¿Cuánto gastó en total el cliente Martínez?",
+          "pasos": [
+            {
+              "paso": 1,
+              "nodo": "agente",
+              "react": "accion",
+              "pensamiento": null,
+              "tool_calls": [
+                {
+                  "id": "call_373087",
+                  "nombre": "buscar_cliente",
+                  "args": {
+                    "nombre": "Martínez"
+                  }
+                }
+              ]
+            },
+            {
+              "paso": 2,
+              "nodo": "tools",
+              "react": "observacion",
+              "herramienta": "buscar_cliente",
+              "tool_call_id": "call_373087",
+              "estado": "success",
+              "resultado": {
+                "error": "nombre ambiguo: 2 clientes coinciden con 'Martínez'",
+                "sugerencia": "No elijas uno al azar: preguntale al usuario a cuál de estos clientes se refiere.",
+                "coincidencias": [
+                  {
+                    "cliente_id": 103,
+                    "nombre": "Lucía Martínez",
+                    "ciudad": "Mendoza"
+                  },
+                  {
+                    "cliente_id": 104,
+                    "nombre": "Pablo Martínez",
+                    "ciudad": "Buenos Aires"
+                  }
+                ]
+              }
+            },
+            {
+              "paso": 3,
+              "nodo": "agente",
+              "react": "respuesta_final",
+              "contenido": "Encontré dos clientes con el apellido Martínez:\n\n- **Lucía Martínez** (Mendoza)\n- **Pablo Martínez** (Buenos Aires)\n\n¿A cuál de los dos te referís?"
+            }
+          ],
+          "respuesta": "Encontré dos clientes con el apellido Martínez:\n\n- **Lucía Martínez** (Mendoza)\n- **Pablo Martínez** (Buenos Aires)\n\n¿A cuál de los dos te referís?",
+          "tool_calls": 1,
+          "error": null,
+          "duracion_s": 64.54
+        },
+        {
+          "thread_id": "sesion-martinez",
+          "pregunta": "Me refiero a Lucía.",
+          "pasos": [
+            {
+              "paso": 1,
+              "nodo": "agente",
+              "react": "accion",
+              "pensamiento": null,
+              "tool_calls": [
+                {
+                  "id": "call_451115",
+                  "nombre": "buscar_pedidos",
+                  "args": {
+                    "cliente_id": 103
+                  }
+                }
+              ]
+            },
+            {
+              "paso": 2,
+              "nodo": "tools",
+              "react": "observacion",
+              "herramienta": "buscar_pedidos",
+              "tool_call_id": "call_451115",
+              "estado": "success",
+              "resultado": {
+                "cliente_id": 103,
+                "nombre": "Lucía Martínez",
+                "cantidad_pedidos": 2,
+                "total": 18400,
+                "pedidos": [
+                  {
+                    "pedido_id": 1003,
+                    "fecha": "2026-07-18",
+                    "estado": "entregado",
+                    "monto": 8500
+                  },
+                  {
+                    "pedido_id": 1008,
+                    "fecha": "2026-09-28",
+                    "estado": "en preparación",
+                    "monto": 9900
+                  }
+                ],
+                "ultimo_pedido_id": 1008
+              }
+            },
+            {
+              "paso": 3,
+              "nodo": "agente",
+              "react": "respuesta_final",
+              "contenido": "Lucía Martínez gastó en total **$18.400** (en 2 pedidos)."
+            }
+          ],
+          "respuesta": "Lucía Martínez gastó en total **$18.400** (en 2 pedidos).",
+          "tool_calls": 1,
+          "error": null,
+          "duracion_s": 59.91
+        }
+      ]
+    },
+    {
+      "titulo": "Aislamiento: otro thread_id no comparte memoria",
+      "notas": [],
+      "turnos": [
+        {
+          "thread_id": "sesion-nueva",
+          "pregunta": "¿Y cuál fue el último pedido?",
+          "pasos": [
+            {
+              "paso": 1,
+              "nodo": "agente",
+              "react": "respuesta_final",
+              "contenido": "¿De qué cliente estamos hablando? Decime su nombre o apellido así te busco los pedidos."
+            }
+          ],
+          "respuesta": "¿De qué cliente estamos hablando? Decime su nombre o apellido así te busco los pedidos.",
+          "tool_calls": 0,
+          "error": null,
+          "duracion_s": 86.34
+        }
+      ]
+    }
+  ]
+}
